@@ -5,48 +5,33 @@ import type { PriceInput } from '@/lib/types'
 import { nanoid } from 'nanoid'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+export async function GET() {
+  return NextResponse.json({ ok: true, note: 'Usa POST para crear la ficha.' })
+}
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: { Allow: 'GET, POST, OPTIONS' } })
+}
 
 export async function POST(req: NextRequest) {
-  // 1) Validación de entorno (ayuda a detectar Vercel mal configurado)
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json(
-      {
-        error:
-          'Faltan variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en Vercel → Project → Settings → Environment Variables.',
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Faltan variables de Supabase en Vercel.' }, { status: 500 })
   }
-
-  // 2) Parseo del body
   let body: any
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Body inválido: se esperaba JSON' }, { status: 400 })
-  }
+  try { body = await req.json() } catch { return NextResponse.json({ error: 'Body inválido' }, { status: 400 }) }
 
-  // 3) Validación mínima
   const required = ['customer_name', 'email', 'appointment_date', 'appointment_time', 'style', 'body_part']
-  for (const k of required) {
-    if (!body[k]) return NextResponse.json({ error: `Falta ${k}` }, { status: 400 })
-  }
+  for (const k of required) if (!body[k]) return NextResponse.json({ error: `Falta ${k}` }, { status: 400 })
 
   try {
     const supabase = createAdminClient()
-
-    // 4) Calcular precio en servidor
     const input: PriceInput = {
-      style: body.style,
-      bodyPart: body.body_part,
-      widthIn: body.width_in ?? null,
-      heightIn: body.height_in ?? null,
-      sizePreset: body.size_preset ?? null,
-      complexityScore: body.image_meta?.complexityScore ?? 1.0,
+      style: body.style, bodyPart: body.body_part,
+      widthIn: body.width_in ?? null, heightIn: body.height_in ?? null,
+      sizePreset: body.size_preset ?? null, complexityScore: body.image_meta?.complexityScore ?? 1.0
     }
     const priced = computePrice(input)
-
-    // 5) Insertar en DB
     const public_id = nanoid(10)
     const { error } = await supabase.from('tattoo_requests').insert({
       public_id,
@@ -64,16 +49,12 @@ export async function POST(req: NextRequest) {
       image_meta: body.image_meta ?? null,
       price: priced.total,
       breakdown: priced.breakdown,
-      status: 'pending',
+      status: 'pending'
     })
-
     if (error) {
-      // Log en server (ver en Vercel → Functions → Logs)
       console.error('submit insert error', error)
       return NextResponse.json({ error: `Supabase insert: ${error.message}` }, { status: 500 })
     }
-
-    // 6) OK
     return NextResponse.json({ id: public_id })
   } catch (e: any) {
     console.error('submit fatal', e?.message, e)
