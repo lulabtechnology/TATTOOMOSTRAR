@@ -17,7 +17,6 @@ export default function BookingForm(){
   const [date, setDate] = useState<string>('2025-10-15')
   const [time, setTime] = useState<string>('15:00')
 
-  // Tipados estrictos segun PriceInput
   const [style, setStyle] = useState<Style>('caricatura')
   const [bodyPart, setBodyPart] = useState<BodyPart>('antebrazo')
 
@@ -28,10 +27,8 @@ export default function BookingForm(){
   const [image, setImage] = useState<File|null>(null)
   const [imageMeta, setImageMeta] = useState<any|null>(null)
 
-  // Estado de envío (loading)
   const [submitting, setSubmitting] = useState(false)
 
-  // bridges para props hijos que esperan string
   const handleStyleChange = (v: string) => setStyle(v as Style)
   const handleBodyPartChange = (v: string) => setBodyPart(v as BodyPart)
 
@@ -59,8 +56,10 @@ export default function BookingForm(){
         fd.append('file', image)
         fd.append('ext', image.type)
         const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        const j = await res.json().catch(()=>({}))
-        if(!res.ok){ console.error('upload error', j); throw new Error(j?.error || 'Error subiendo imagen') }
+        const txt = await res.text()
+        let j: any = {}
+        try { j = JSON.parse(txt) } catch {}
+        if(!res.ok){ console.error('upload error', txt); throw new Error(j?.error || txt || 'Error subiendo imagen') }
         uploadedUrl = j.url
       }
 
@@ -80,11 +79,13 @@ export default function BookingForm(){
 
       const res2 = await fetch('/api/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, // importante para Next.js
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      const j2 = await res2.json().catch(()=>({}))
-      if(!res2.ok){ console.error('submit error', j2); throw new Error(j2?.error || 'Error creando la reserva') }
+      const txt2 = await res2.text()
+      let j2: any = {}
+      try { j2 = JSON.parse(txt2) } catch {}
+      if(!res2.ok){ console.error('submit error', txt2); throw new Error(j2?.error || txt2 || 'Error creando la reserva') }
 
       r.push(`/review/${j2.id}`)
     }catch(e:any){
