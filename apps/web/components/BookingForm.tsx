@@ -29,9 +29,6 @@ export default function BookingForm(){
 
   const [submitting, setSubmitting] = useState(false)
 
-  const handleStyleChange = (v: string) => setStyle(v as Style)
-  const handleBodyPartChange = (v: string) => setBodyPart(v as BodyPart)
-
   const priceInput: PriceInput = useMemo(()=>({
     style,
     bodyPart,
@@ -56,11 +53,15 @@ export default function BookingForm(){
         fd.append('file', image)
         fd.append('ext', image.type)
         const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        const txt = await res.text()
-        let j: any = {}
-        try { j = JSON.parse(txt) } catch {}
-        if(!res.ok){ console.error('upload error', txt); throw new Error(j?.error || txt || 'Error subiendo imagen') }
-        uploadedUrl = j.url
+        const bodyTxt = await res.text()
+        let bodyJson: any = {}
+        try { bodyJson = JSON.parse(bodyTxt) } catch {}
+        if(!res.ok){
+          console.error('upload error', { status: res.status, bodyTxt })
+          const msg = bodyJson?.error || bodyTxt || `Error subiendo imagen (status ${res.status})`
+          throw new Error(msg)
+        }
+        uploadedUrl = bodyJson.url
       }
 
       const payload = {
@@ -82,10 +83,14 @@ export default function BookingForm(){
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      const txt2 = await res2.text()
+      const bodyTxt2 = await res2.text()
       let j2: any = {}
-      try { j2 = JSON.parse(txt2) } catch {}
-      if(!res2.ok){ console.error('submit error', txt2); throw new Error(j2?.error || txt2 || 'Error creando la reserva') }
+      try { j2 = JSON.parse(bodyTxt2) } catch {}
+      if(!res2.ok){
+        console.error('submit error', { status: res2.status, bodyTxt2 })
+        const msg = j2?.error || bodyTxt2 || `Error creando la reserva (status ${res2.status})`
+        throw new Error(msg.length > 300 ? msg.slice(0,300)+'…' : msg)
+      }
 
       r.push(`/review/${j2.id}`)
     }catch(e:any){
@@ -123,8 +128,8 @@ export default function BookingForm(){
           </div>
         </div>
 
-        <StyleSelector value={style} onChange={handleStyleChange} />
-        <BodyPartSelector value={bodyPart} onChange={handleBodyPartChange} />
+        <StyleSelector value={style} onChange={(v)=>setStyle(v as Style)} />
+        <BodyPartSelector value={bodyPart} onChange={(v)=>setBodyPart(v as BodyPart)} />
         <SizePicker
           unit={unit}
           setUnit={setUnit}
