@@ -9,25 +9,22 @@ export async function GET(){
 
     let canQuery = false
     let rows = 0
-    let buckets: any[] = []
-    let tableExists = false
     let errorMsg: string | null = null
+    let buckets: any[] = []
 
     if(okEnv){
       const supabase = createAdminClient()
-      // tabla
-      const { count, error } = await supabase.from('tattoo_requests').select('*', { head: true, count: 'exact' })
-      if(!error){ canQuery = true; rows = count ?? 0 }
-      else { errorMsg = error.message }
+      const { count, error } = await supabase
+        .from('tattoo_requests')
+        .select('*', { head: true, count: 'exact' })
+      if(!error){ canQuery = true; rows = count ?? 0 } else { errorMsg = error.message }
 
-      // buckets (para confirmar storage)
-      const { data: bks, error: e2 } = await (supabase as any).storage.listBuckets()
-      if(!e2 && Array.isArray(bks)){ buckets = bks }
-      tableExists = !error || /does not exist/i.test(error.message) === false
+      const { data: bks } = await (supabase as any).storage.listBuckets()
+      if(Array.isArray(bks)) buckets = bks
     }
 
-    return NextResponse.json({ ok: okEnv, supabaseUrl: url, canQuery, rows, tableExists, buckets, errorMsg })
+    return NextResponse.json({ okEnv, supabaseUrl: url, canQuery, rows, errorMsg, buckets })
   }catch(e:any){
-    return NextResponse.json({ ok:false, error: e.message }, { status: 500 })
+    return NextResponse.json({ okEnv:false, error: e.message }, { status: 500 })
   }
 }
