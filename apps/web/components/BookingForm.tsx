@@ -6,7 +6,7 @@ import StyleSelector from '@/components/StyleSelector'
 import SizePicker from '@/components/SizePicker'
 import ImageUploader from '@/components/ImageUploader'
 import { computePrice } from '@/lib/price'
-import type { PriceInput } from '@/lib/types'
+import type { PriceInput, Style, BodyPart } from '@/lib/types'
 import PriceSummary from '@/components/PriceSummary'
 
 export default function BookingForm(){
@@ -17,8 +17,10 @@ export default function BookingForm(){
   const [date, setDate] = useState<string>('2025-10-15')
   const [time, setTime] = useState<string>('15:00')
 
-  const [style, setStyle] = useState('caricatura')
-  const [bodyPart, setBodyPart] = useState('antebrazo')
+  // 👇 tipados estrictos según PriceInput
+  const [style, setStyle] = useState<Style>('caricatura')
+  const [bodyPart, setBodyPart] = useState<BodyPart>('antebrazo')
+
   const [unit, setUnit] = useState<'in'|'cm'>('in')
   const [preset, setPreset] = useState<string|null>('3x3')
   const [width, setWidth] = useState<number|null>(null)
@@ -26,11 +28,15 @@ export default function BookingForm(){
   const [image, setImage] = useState<File|null>(null)
   const [imageMeta, setImageMeta] = useState<any|null>(null)
 
+  // bridges para props hijos que esperan string
+  const handleStyleChange = (v: string) => setStyle(v as Style)
+  const handleBodyPartChange = (v: string) => setBodyPart(v as BodyPart)
+
   const priceInput: PriceInput = useMemo(()=>({
     style,
     bodyPart,
-    widthIn: width? (unit==='cm'? width/2.54 : width) : null,
-    heightIn: height? (unit==='cm'? height/2.54 : height) : null,
+    widthIn: width ? (unit==='cm' ? width/2.54 : width) : null,
+    heightIn: height ? (unit==='cm' ? height/2.54 : height) : null,
     sizePreset: preset,
     complexityScore: imageMeta?.complexityScore ?? 1.0
   }), [style, bodyPart, width, height, unit, preset, imageMeta])
@@ -100,10 +106,18 @@ export default function BookingForm(){
           </div>
         </div>
 
-        <StyleSelector value={style} onChange={setStyle} />
-        <BodyPartSelector value={bodyPart} onChange={setBodyPart} />
-        <SizePicker unit={unit} setUnit={setUnit} preset={preset} setPreset={setPreset}
-          width={width} setWidth={setWidth} height={height} setHeight={setHeight} />
+        <StyleSelector value={style} onChange={handleStyleChange} />
+        <BodyPartSelector value={bodyPart} onChange={handleBodyPartChange} />
+        <SizePicker
+          unit={unit}
+          setUnit={setUnit}
+          preset={preset}
+          setPreset={setPreset}
+          width={width}
+          setWidth={setWidth}
+          height={height}
+          setHeight={setHeight}
+        />
         <ImageUploader onReady={({ file, meta })=>{ setImage(file); setImageMeta(meta) }} />
       </div>
 
