@@ -5,7 +5,8 @@ import BodyPartSelector from '@/components/BodyPartSelector'
 import StyleSelector from '@/components/StyleSelector'
 import SizePicker from '@/components/SizePicker'
 import ImageUploader from '@/components/ImageUploader'
-import { computePrice, PriceInput } from '@/lib/price'
+import { computePrice } from '@/lib/price'
+import type { PriceInput } from '@/lib/types'
 import PriceSummary from '@/components/PriceSummary'
 
 export default function BookingForm(){
