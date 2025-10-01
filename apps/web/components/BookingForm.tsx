@@ -17,7 +17,7 @@ export default function BookingForm(){
   const [date, setDate] = useState<string>('2025-10-15')
   const [time, setTime] = useState<string>('15:00')
 
-  // 👇 tipados estrictos según PriceInput
+  // Tipados estrictos segun PriceInput
   const [style, setStyle] = useState<Style>('caricatura')
   const [bodyPart, setBodyPart] = useState<BodyPart>('antebrazo')
 
@@ -27,6 +27,9 @@ export default function BookingForm(){
   const [height, setHeight] = useState<number|null>(null)
   const [image, setImage] = useState<File|null>(null)
   const [imageMeta, setImageMeta] = useState<any|null>(null)
+
+  // Estado de envío (loading)
+  const [submitting, setSubmitting] = useState(false)
 
   // bridges para props hijos que esperan string
   const handleStyleChange = (v: string) => setStyle(v as Style)
@@ -47,35 +50,48 @@ export default function BookingForm(){
     if(!style || !bodyPart) return alert('Completa estilo y parte del cuerpo')
     if(!preset && !(width && height)) return alert('Define el tamaño (preset o personalizado)')
 
-    let uploadedUrl: string | null = null
-    if(image){
-      const fd = new FormData()
-      fd.append('file', image)
-      fd.append('ext', image.type)
-      const res = await fetch('/api/upload', { method: 'POST', body: fd })
-      const j = await res.json()
-      if(!res.ok) return alert(j.error || 'Error subiendo imagen')
-      uploadedUrl = j.url
-    }
+    try{
+      setSubmitting(true)
 
-    const payload = {
-      customer_name: customerName,
-      email, phone,
-      appointment_date: date,
-      appointment_time: time,
-      style,
-      body_part: bodyPart,
-      size_preset: preset,
-      width_in: priceInput.widthIn,
-      height_in: priceInput.heightIn,
-      image_url: uploadedUrl,
-      image_meta: imageMeta
-    }
+      let uploadedUrl: string | null = null
+      if(image){
+        const fd = new FormData()
+        fd.append('file', image)
+        fd.append('ext', image.type)
+        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        const j = await res.json().catch(()=>({}))
+        if(!res.ok){ console.error('upload error', j); throw new Error(j?.error || 'Error subiendo imagen') }
+        uploadedUrl = j.url
+      }
 
-    const res2 = await fetch('/api/submit', { method: 'POST', body: JSON.stringify(payload) })
-    const j2 = await res2.json()
-    if(!res2.ok) return alert(j2.error || 'Error creando la reserva')
-    r.push(`/review/${j2.id}`)
+      const payload = {
+        customer_name: customerName,
+        email, phone,
+        appointment_date: date,
+        appointment_time: time,
+        style,
+        body_part: bodyPart,
+        size_preset: preset,
+        width_in: priceInput.widthIn,
+        height_in: priceInput.heightIn,
+        image_url: uploadedUrl,
+        image_meta: imageMeta
+      }
+
+      const res2 = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, // importante para Next.js
+        body: JSON.stringify(payload)
+      })
+      const j2 = await res2.json().catch(()=>({}))
+      if(!res2.ok){ console.error('submit error', j2); throw new Error(j2?.error || 'Error creando la reserva') }
+
+      r.push(`/review/${j2.id}`)
+    }catch(e:any){
+      alert(e?.message || 'Ocurrió un error')
+    }finally{
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -124,7 +140,9 @@ export default function BookingForm(){
       <div className="card space-y-4 h-fit">
         <h3 className="font-semibold">Estimado</h3>
         <PriceSummary price={quote.total} breakdown={quote.breakdown} />
-        <button onClick={onSubmit} className="btn btn-primary w-full">Subir y crear ficha</button>
+        <button onClick={onSubmit} disabled={submitting} className="btn btn-primary w-full">
+          {submitting ? 'Creando ficha…' : 'Subir y crear ficha'}
+        </button>
         <p className="text-xs text-gray-500">Nota: análisis y precio son aproximados (demo).</p>
       </div>
     </div>
