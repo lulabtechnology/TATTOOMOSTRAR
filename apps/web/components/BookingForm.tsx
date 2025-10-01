@@ -17,6 +17,7 @@ export default function BookingForm(){
   const [date, setDate] = useState<string>('2025-10-15')
   const [time, setTime] = useState<string>('15:00')
 
+  // Tipados estrictos
   const [style, setStyle] = useState<Style>('caricatura')
   const [bodyPart, setBodyPart] = useState<BodyPart>('antebrazo')
 
@@ -47,23 +48,24 @@ export default function BookingForm(){
     try{
       setSubmitting(true)
 
+      // 1) Subida de imagen (opcional)
       let uploadedUrl: string | null = null
       if(image){
         const fd = new FormData()
         fd.append('file', image)
         fd.append('ext', image.type)
         const res = await fetch('/api/upload', { method: 'POST', body: fd })
-        const bodyTxt = await res.text()
-        let bodyJson: any = {}
-        try { bodyJson = JSON.parse(bodyTxt) } catch {}
+        const txt = await res.text()
+        let j: any = {}; try { j = JSON.parse(txt) } catch {}
         if(!res.ok){
-          console.error('upload error', { status: res.status, bodyTxt })
-          const msg = bodyJson?.error || bodyTxt || `Error subiendo imagen (status ${res.status})`
+          console.error('upload error', res.status, txt)
+          const msg = j?.error || txt || `Error subiendo imagen (${res.status})`
           throw new Error(msg)
         }
-        uploadedUrl = bodyJson.url
+        uploadedUrl = j.url
       }
 
+      // 2) Crear ficha (con fallback de endpoint)
       const payload = {
         customer_name: customerName,
         email, phone,
@@ -78,21 +80,30 @@ export default function BookingForm(){
         image_meta: imageMeta
       }
 
-      const res2 = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      const bodyTxt2 = await res2.text()
-      let j2: any = {}
-      try { j2 = JSON.parse(bodyTxt2) } catch {}
-      if(!res2.ok){
-        console.error('submit error', { status: res2.status, bodyTxt2 })
-        const msg = j2?.error || bodyTxt2 || `Error creando la reserva (status ${res2.status})`
-        throw new Error(msg.length > 300 ? msg.slice(0,300)+'…' : msg)
+      const endpoints = ['/api/create', '/api/submit']
+      let lastText = '', lastStatus = 0
+
+      for(const ep of endpoints){
+        const res2 = await fetch(ep, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        const txt2 = await res2.text()
+
+        if(res2.ok){
+          const j2 = JSON.parse(txt2)
+          r.push(`/review/${j2.id}`)
+          return
+        }else{
+          console.warn('endpoint failed', ep, res2.status, txt2)
+          lastText = txt2; lastStatus = res2.status
+          if(res2.status === 405) continue // intenta el siguiente
+          break
+        }
       }
 
-      r.push(`/review/${j2.id}`)
+      throw new Error((lastText || 'Error creando la reserva') + (lastStatus ? ` (status ${lastStatus})` : ''))
     }catch(e:any){
       alert(e?.message || 'Ocurrió un error')
     }finally{
